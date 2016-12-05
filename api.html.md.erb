@@ -30,26 +30,15 @@ that do not understand them.
 
 ## <a id='overview'></a>API Overview ##
 
-The Service Broker API defines the contract between the services marketplace of a platform and the service broker.
+The Service Broker API defines an HTTP interface between the services marketplace of a platform and service brokers. 
 
-### <a id='def-servicebroker'></a>Definition: Service Broker
+The service broker is the component of the service that implements the Service Broker API, for which a platform's marketplace is a client. Service brokers are responsible for advertising a catalog of service offerings and service plans to the marketplace, and acting on requests from the marketplace for provisioning, binding, unbinding, and deprovisioning.  
 
-The service broker is the component of the service that implements the Service Broker API. Service brokers do the following:
+In general, provisioning reserves a resource on a service; we call this reserved resource a service instance. What a service instance represents can vary by service. Examples include a single database on a multi-tenant server, a dedicated cluster, or an account on a web application.
 
-* Advertise a catalog of service offerings and service plans on the services marketplace of a platform 
-* Interpret calls for provisioning, binding, unbinding, and deprovisioning
+What a binding represents may also vary by service. In general creation of a binding either generates credentials necessary for accessing the resource or provides the service instance with information for a configuration change. 
 
-What a broker does with each call can vary between services. In general, "provision" reserves resources on a service and "bind" delivers information to an application necessary for accessing the resource. 
-
-The reserved resource is a service instance. What a service instance represents can vary by service. It can be a single database on a multi-tenant server, a dedicated cluster, or an account on a web application.
-
-### <a id='servicebroker-features'></a>Service Broker Features
-
-A service broker has the following features:
-
-* Implements several HTTP (or HTTPS) endpoints underneath a URI prefix
-* Can provide one or more services, with load balancing to enable horizontal scalability of redundant brokers
-* Can support multiple platform instances with a single broker using different URL prefixes and credentials
+A platform marketplace may expose services from one or many service brokers, and an individual service broker may support one or many platform marketplaces using different URL prefixes and credentials.
 
 ## <a id='api-version-header'></a>API Version Header ##
 
