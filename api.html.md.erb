@@ -42,77 +42,29 @@ A platform marketplace may expose services from one or many service brokers, and
 
 ## <a id='api-version-header'></a>API Version Header ##
 
-Requests from the platform to the service broker must contain a header that defines the version number of the Service Broker API that the marketplace will use. Consult the following example of the API version header:
+Requests from the platform to the service broker must contain a header that declares the version number of the Service Broker API that the marketplace will use:
 
 `X-Broker-Api-Version: 2.10`
 
 The version numbers are in the format `MAJOR.MINOR`, using semantic versioning
 such that 2.9 comes before 2.10.
 
-This header will be useful in future minor revisions of the API to allow
-brokers to reject requests from marketplaces that they do not understand. While minor API revisions will always be additive, it is possible that brokers
-will come to depend on a feature that was added after 2.0, so they may use this
-header to reject the request.
-
-### <a id='error-message'></a>Service Broker Error Message ##
-
-A service broker should respond with a `412 Precondition Failed` message when rejecting a request.
-
-Error messages from the service broker should inform the operator of the following: 
-
-* The required version number
-* The actual version number
+This header allows brokers to reject requests from marketplaces for versions they do not support. While minor API revisions will always be additive, it is possible that brokers depend on a feature from a newer version of the API that is supported by the platform. In this scenario the broker may reject the request with `412 Precondition Failed` and provide a message that informs the operator of the required API version.
 
 ## <a id='authentication'></a>Authentication ##
 
 The marketplace must authenticate with the service broker using HTTP
-basic authentication with the `Authorization:` header on every request and
-reject any broker registrations that do not contain a username and password.
-The broker is responsible for checking the username and password and returning
-a `401 Unauthorized` message if credentials are invalid.
+basic authentication (the `Authorization:` header) on every request. The broker is responsible for validating the username and password and returning a `401 Unauthorized` message if credentials are invalid. It is recommended that brokers support secure communication from platform marketplaces over TLS.
 
 ## <a id='catalog-mgmt'></a>Catalog Management ##
 
 The first endpoint that a broker must implement is the service catalog.
-The marketplace initially fetches this endpoint from all brokers and makes
-adjustments to the user-facing service catalog stored in the marketplace
-database in response to different events.
+The platform marketplace fetches this endpoint from all brokers in order to present an aggregated user-facing catalog. 
 
-Consult the following table to understand how different events trigger different actions from the marketplace.
+Warnings for broker authors:
 
-<table>
-  <tr>
-    <th>Event</th>
-    <th>Action</th>
-  </tr>
-  <tr>
-    <td>The catalog fails to initially load or validate.</td>
-    <td>The marketplace must not allow the operator to add the new broker and give a meaningful error message.</td>
-  </tr>
-  <tr>
-    <td>The broker is updated.</td>
-    <td>The marketplace must update the catalog, so that a developer can use <code>update-service-broker</code> with no changes to force a catalog refresh.
-  </tr>
-  <tr>
-    <td>The marketplace fetches a catalog from a broker.</td>
-    <td>The marketplace must compare the broker's ID for services and plans with the <code>unique_id</code> values for services and plans in the marketplace database.</td>
-  </tr>
-  <tr>
-    <td>A service or plan in the broker catalog has an ID that is not present among the <code>unique_id</code> values in the marketplace database.</td>
-    <td>A new record must be added to the marketplace database.</td>
-  </tr>
-  <tr>
-    <td>A service or plan in the marketplace database are found with a <code>unique_id</code> that matches the broker catalog's ID.</td>
-    <td>The marketplace must update the records to match the broker's catalog.</td>
-  </tr>
-  <tr>
-    <td>The database has plans that are not found in the broker catalog, and there are no associated service instances.</td>
-    <td>The marketplace must remove these plans from the database, and then delete services that do not have associated plans from the database.
-  </tr>
-  <tr>
-    <td>The database has plans that are not found in the broker catalog, but there are provisioned instances.</td>
-    <td>The marketplace must mark the plan inactive and no longer display it or allow it to be provisionable.</td>
-</table>
+- Be cautious removing services and plans from their catalogs, as platform marketplaces may have provisioned service instances of these plans. Consider your deprecation strategy. 
+- Do not change the ids of services and plans. This action is likely to be evaluated by a platform marketplace as a removal of one plan and addition of another. See above warning about removal of plans.
 
 The following sections describe catalog requests and responses in the Service Broker API.
 
@@ -182,17 +134,17 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 <tr>
   <td>&nbsp;&nbsp;&nbsp;name*</td>
   <td>string</td>
-  <td>The CLI-friendly name of the service that will appear in the catalog. All lowercase, no spaces. This must be unique within the platform.</td>
+  <td>A CLI-friendly name of the service. All lowercase, no spaces. This must be globally unique within a platform marketplace.</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;id*</td>
   <td>string</td>
-  <td>An identifier used to correlate this service in future requests to the catalog. This must be unique within the platform. Using a GUID is recommended. </td>
+  <td>An identifier used to correlate this service in future requests to the broker. This must be globally unique within a platform marketplace. Using a GUID is recommended. </td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;description*</td>
   <td>string</td>
-  <td>A short description of the service that will appear in the catalog.</td>
+  <td>A short description of the service.</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;tags</td>
@@ -253,7 +205,7 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 <tr>
   <td>&nbsp;&nbsp;&nbsp;id</td>
   <td>string</td>
-  <td>The id of the Oauth2 client that the service intends to use. The name may be taken, in which case the updat will return an error to the operator</td>
+  <td>The id of the Oauth2 client that the service intends to use. The name may be taken, in which case the update will return an error to the operator</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;secret</td>
@@ -263,7 +215,7 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 <tr>
   <td>&nbsp;&nbsp;&nbsp;redirect_uri</td>
   <td>string</td>
-  <td>A domain for the service dashboard that will be whitelisted by the UAA to enable SSO</td>
+  <td>A URI for the service dashboard</td>
 </tr>
 </tbody>
 </table>
@@ -283,27 +235,27 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 <tr>
   <td>&nbsp;&nbsp;&nbsp;id*</td>
   <td>string</td>
-  <td>An identifier used to correlate this plan in future requests to the catalog. This must be unique within the platform. Using a GUID is recommended.</td>
+  <td>An identifier used to correlate this plan in future requests to the broker. This must be globally unique within a platform marketplace. Using a GUID is recommended.</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;name*</td>
   <td>string</td>
-  <td>The CLI-friendly name of the plan that will appear in the catalog. All lowercase, no spaces.</td>
+  <td>The CLI-friendly name of the plan. Must be unique within the service. All lowercase, no spaces.</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;description*</td>
   <td>string</td>
-  <td>A short description of the service that will appear in the catalog.</td>
+  <td>A short description of the plan.</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;metadata</td>
   <td>object</td>
-  <td>A list of metadata for a service plan. For more information, see <a href="catalog-metadata.html">Service Metadata</a>.</td>
+  <td>A list of metadata for a service plan.</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;free</td>
   <td>boolean</td>
-  <td>This field allows the plan to be limited by the non_basic_services_allowed field in a platform quota. The default is true</td>
+  <td>When false, instances of this plan have a cost. The default is true</td>
 </tr>
 </tbody>
 </table>
@@ -382,7 +334,7 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 
 ### <a id='create-broker'></a>Adding a Broker to the Platform ###
 
-After implementing the first endpoint `GET /v2/catalog` documented (above)[catalog-mgmt], you must register the service broker with your platform to make your services and plans available to end users.
+After implementing the first endpoint `GET /v2/catalog` documented [above](#catalog-mgmt), you must register the service broker with your platform to make your services and plans available to end users.
 
 ## <a id='synch-asynchronous-operations'></a>Synchronous and Asynchronous Operations ##
 
