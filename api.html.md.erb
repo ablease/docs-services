@@ -338,18 +338,23 @@ After implementing the first endpoint `GET /v2/catalog` documented [above](#cata
 
 ## <a id='synch-asynchronous-operations'></a>Synchronous and Asynchronous Operations ##
 
-The Service Broker API supports both synchronous and asynchronous operations. Brokers must respond to requests with either a synchronous or asynchronous response:
+Broker clients expect prompt responses to all API requests in order to provide users with fast feedback. Service broker authors should implement their brokers to respond promptly to all requests but must decide whether to implement synchronous or asynchronous responses. Brokers that can guarantee completion of the requested operation with the response should return the synchronous response. Brokers that cannot guarantee completion of the operation with the response should implement the asynchronous response.
 
-* `201 CREATED`: Users expect a service instance to be provisioned and usable.
-* `202 ACCEPTED`: The requested operation has been accepted but is not complete.
+Providing a synchronous response for a provision, update, or bind operation before actual completion causes confusion for users as their service may not be usable and they have no way to find out when it will be. Asynchronous responses set expectations for users that an operation is in progress and can also provide updates on the status of the operation. 
 
-Service brokers must respond to all marketplace requests within 60 seconds. Brokers that can guarantee completion of the requested operation with the response should return the synchronous response. Brokers that cannot guarantee completion of the operation with the response should implement support for asynchronous provisioning. Support for synchronous or asynchronous responses may vary by service offering, even by service plan.
+Support for synchronous or asynchronous responses may vary by service offering, even by service plan.
 
 ###<a id='sync'></a> Synchronous Operations
 
-To execute a request synchronously, the broker need only return the usual status codes: `201 CREATED` for create, and `200 OK` for update and delete.
+To execute a request synchronously, the broker need only return the usual status codes: `201 CREATED` for provision and bind, and `200 OK` for update, unbind, and deprovision.
 
-If the `accepts_incomplete=true` parameter is not included, and the broker cannot fulfill the request synchronously (guaranteeing that the operation is complete on response), then the broker should reject the request with the status code `422 UNPROCESSABLE ENTITY` and the following body:
+Brokers that support sychronous responses for provision, update, and delete can ignore the `accepts_incomplete=true` query parameter if it is provided by the client. 
+
+###<a id='async'></a> Asynchronous Operations
+
+<p class='note'><strong>Note:</strong> Asynchronous Operations are currently supported only for provision, update, and deprovision.</p>
+
+For a broker to return an asynchronous response, the query parameter `accepts_incomplete=true` must be included the request. If the parameter is not included or is set to `false`, and the broker cannot fulfill the request synchronously (guaranteeing that the operation is complete on response), then the broker should reject the request with the status code `422 UNPROCESSABLE ENTITY` and the following body:
 
 <pre class="terminal">
 {
@@ -358,15 +363,9 @@ If the `accepts_incomplete=true` parameter is not included, and the broker canno
 }
 </pre>
 
-###<a id='async'></a> Asynchronous Operations
+If the query parameter described above is present, and the broker executes the request asynchronously, the broker must return the asynchronous response `202 ACCEPTED`. The response body should be the same as if the broker were serving the request synchronously.
 
-The `202 ACCEPTED` response triggers the platform to poll a new endpoint `/v2/service_instances/:guid/last_operation` until the broker indicates that the requested operation has succeeded or failed. During the intervening time, end users are able to discover the state of the requested operation using platform API clients.
-
-For an operation to be executed asynchronously, the platform API client, the platform, and service broker must support the feature. The parameter `accepts_incomplete=true` must be passed in a request by the platform API client, triggering the platform to include the same parameter in a request to the broker. The broker can then choose to execute the request synchronously or asynchronously.
-
-If the broker executes the request asynchronously, the response must use the status code `202 ACCEPTED`. The response body should be the same as if the broker were serving the request synchronously.
-
-<p class='note'><strong>Note:</strong> Asynchronous Operations are currently supported only for provision, update, and deprovision. Bind and unbind will be added once the feature is considered stable.</p>
+An asynchronous response triggers the platform marketplace to poll the endpoint `GET /v2/service_instances/:guid/last_operation` until the broker indicates that the requested operation has succeeded or failed. Brokers may include a status message with each response for the `last_operation` endpoint that provides visibility to end users as to the progress of the operation.
 
 #### <a id='blocking'></a>Blocking Operations ####
 
