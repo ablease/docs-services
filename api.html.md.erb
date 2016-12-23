@@ -2,8 +2,6 @@
 title: Service Broker API v2.10
 owner: Services API
 ---
-test
-
 <strong><%= modified_date %></strong>
 
 This topic describes the Service Broker API, which developers implement to integrate their service with the services marketplace of a platform.
@@ -31,13 +29,13 @@ that do not understand them.
 
 ## <a id='overview'></a>API Overview ##
 
-The Service Broker API defines an HTTP interface between the services marketplace of a platform and service brokers. 
+The Service Broker API defines an HTTP interface between the services marketplace of a platform and service brokers.
 
-The service broker is the component of the service that implements the Service Broker API, for which a platform's marketplace is a client. Service brokers are responsible for advertising a catalog of service offerings and service plans to the marketplace, and acting on requests from the marketplace for provisioning, binding, unbinding, and deprovisioning.  
+The service broker is the component of the service that implements the Service Broker API, for which a platform's marketplace is a client. Service brokers are responsible for advertising a catalog of service offerings and service plans to the marketplace, and acting on requests from the marketplace for provisioning, binding, unbinding, and deprovisioning.
 
 In general, provisioning reserves a resource on a service; we call this reserved resource a service instance. What a service instance represents can vary by service. Examples include a single database on a multi-tenant server, a dedicated cluster, or an account on a web application.
 
-What a binding represents may also vary by service. In general creation of a binding either generates credentials necessary for accessing the resource or provides the service instance with information for a configuration change. 
+What a binding represents may also vary by service. In general creation of a binding either generates credentials necessary for accessing the resource or provides the service instance with information for a configuration change.
 
 A platform marketplace may expose services from one or many service brokers, and an individual service broker may support one or many platform marketplaces using different URL prefixes and credentials.
 
@@ -60,11 +58,11 @@ basic authentication (the `Authorization:` header) on every request. The broker 
 ## <a id='catalog-mgmt'></a>Catalog Management ##
 
 The first endpoint that a broker must implement is the service catalog.
-The platform marketplace fetches this endpoint from all brokers in order to present an aggregated user-facing catalog. 
+The platform marketplace fetches this endpoint from all brokers in order to present an aggregated user-facing catalog.
 
 Warnings for broker authors:
 
-- Be cautious removing services and plans from their catalogs, as platform marketplaces may have provisioned service instances of these plans. Consider your deprecation strategy. 
+- Be cautious removing services and plans from their catalogs, as platform marketplaces may have provisioned service instances of these plans. Consider your deprecation strategy.
 - Do not change the ids of services and plans. This action is likely to be evaluated by a platform marketplace as a removal of one plan and addition of another. See above warning about removal of plans.
 
 The following sections describe catalog requests and responses in the Service Broker API.
@@ -341,7 +339,7 @@ After implementing the first endpoint `GET /v2/catalog` documented [above](#cata
 
 Broker clients expect prompt responses to all API requests in order to provide users with fast feedback. Service broker authors should implement their brokers to respond promptly to all requests but must decide whether to implement synchronous or asynchronous responses. Brokers that can guarantee completion of the requested operation with the response should return the synchronous response. Brokers that cannot guarantee completion of the operation with the response should implement the asynchronous response.
 
-Providing a synchronous response for a provision, update, or bind operation before actual completion causes confusion for users as their service may not be usable and they have no way to find out when it will be. Asynchronous responses set expectations for users that an operation is in progress and can also provide updates on the status of the operation. 
+Providing a synchronous response for a provision, update, or bind operation before actual completion causes confusion for users as their service may not be usable and they have no way to find out when it will be. Asynchronous responses set expectations for users that an operation is in progress and can also provide updates on the status of the operation.
 
 Support for synchronous or asynchronous responses may vary by service offering, even by service plan.
 
@@ -349,7 +347,7 @@ Support for synchronous or asynchronous responses may vary by service offering, 
 
 To execute a request synchronously, the broker need only return the usual status codes: `201 CREATED` for provision and bind, and `200 OK` for update, unbind, and deprovision.
 
-Brokers that support sychronous responses for provision, update, and delete can ignore the `accepts_incomplete=true` query parameter if it is provided by the client. 
+Brokers that support sychronous responses for provision, update, and delete can ignore the `accepts_incomplete=true` query parameter if it is provided by the client.
 
 ###<a id='async'></a> Asynchronous Operations
 
@@ -486,31 +484,14 @@ The frequency and maximum duration of polling may vary by platform client. If a 
 
 ## <a id='provisioning'></a>Provisioning ##
 
-When the broker receives a provision request from the platform, it should
-synchronously take whatever action is necessary to create a new service
-resource for the developer.
-The result of provisioning varies by service type, although there are a few
-common actions that work for many services.
-For a MySQL service, provisioning could result in:
-
-* An empty dedicated `mysqld` process running on its own VM.
-* An empty dedicated `mysqld` process running in a lightweight container on a
-shared VM.
-* An empty dedicated `mysqld` process running on a shared VM.
-* An empty dedicated database, on an existing shared running `mysqld`.
-* A database with business schema already there.
-* A copy of a full database, for example a QA database that is a copy of the
-production database.
-
-For non-data services, provisioning could just mean getting an account on an
-existing system.
+When the broker receives a provision request from the platform, it should take whatever action is necessary to create a new resource. What provisioning represents varies by service and plan, although there are several common use cases. For a MySQL service, provisioning could result in an empty dedicated database server running on its own VM or an empty schema on a shared database server. For non-data services, provisioning could just mean an account on an multi-tenant SaaS application.
 
 ### Request ###
 
 ##### Route #####
 `PUT /v2/service_instances/:instance_id`
 
-<p class="note"><strong>Note</strong>: The <code>:instance_id</code> of a service instance is provided by the platform. This ID will be used for future requests (bind and deprovision), so the broker must use it to correlate the resource it creates.</p>
+<p class="note"><strong>Note</strong>: The <code>:instance_id</code> of a service instance is provided by the platform marketplace. This ID will be used for subsequent operations on the service instance (bind and deprovision), so the broker must use it to identify the service instance it provisions.</p>
 
 ##### Body #####
 
@@ -523,35 +504,35 @@ existing system.
 </tr>
 </thead>
 <tbody>
-<tr>
-  <td>organization_guid*</td>
-  <td>string</td>
-  <td>The marketplace GUID of the organization under which the service is to be provisioned. Although most brokers will not use this field, it could be helpful in determining data placement or applying custom business rules.</td>
-</tr>
+  <tr>
+    <td>service_id*</td>
+    <td>string</td>
+    <td>The ID of the service (from the catalog). Must be globally unique.</td>
+  </tr>
 <tr>
   <td>plan_id*</td>
   <td>string</td>
-  <td>The ID of the plan within the above service (from the catalog endpoint) that the user would like provisioned. Because plans have identifiers unique to a broker, this is enough information to determine what to provision.</td>
-</tr>
-<tr>
-  <td>service_id*</td>
-  <td>string</td>
-  <td>The ID of the service within the catalog above.</td>
-</tr>
-<tr>
-  <td>space_guid*</td>
-  <td>string</td>
-  <td>Similar to organization_guid, but for the space.</td>
+  <td>The ID of the plan (from the catalog) for which the service instance has been requested. Must be unique to a service.</td>
 </tr>
 <tr>
   <td>parameters</td>
   <td>JSON object</td>
-  <td>Platform API clients should provide a JSON object of configuration parameters with their request and this value will be passed through to the service broker. Brokers are responsible for validation.</td>
+  <td>Platforms may provide a JSON object of configuration options obtained from end users. Brokers are responsible for validation.</td>
 </tr>
 <tr>
   <td>accepts_incomplete</td>
   <td>boolean</td>
-  <td>A value of true indicates that both the marketplace and the requesting client support asynchronous provisioning. If this parameter is not included in the request, and the broker can only provision an instance of the requested plan asynchronously, the broker should reject the request with a 422 as described below.</td>
+  <td>A value of true indicates that the marketplace and its clients support asychronous broker operations. If this parameter is not included in the request, and the broker can only provision an instance of the requested plan asynchronously, the broker should reject the request with a 422 as described below.</td>
+</tr>
+<tr>
+  <td>organization_guid*</td>
+  <td>string</td>
+  <td>The platform GUID for the organization under which the service is to be provisioned. Although most brokers will not use this field, it may be helpful for executing operations on a user's behalf.</td>
+</tr>
+<tr>
+  <td>space_guid*</td>
+  <td>string</td>
+  <td>The identifier for the project space within the platform organization. Although most brokers will not use this field, it may be helpful for executing operations on a user's behalf.</td>
 </tr>
 </tbody>
 </table>
@@ -561,10 +542,10 @@ existing system.
 <pre class="terminal">
 {
   "organization_guid": "org-guid-here",
-  "plan_id":           "plan-guid-here",
-  "service_id":        "service-guid-here",
-  "space_guid":        "space-guid-here",
-  "parameters":        {
+  "plan_id": "plan-guid-here",
+  "service_id": "service-guid-here",
+  "space_guid": "space-guid-here",
+  "parameters": {
     "parameter1": 1,
     "parameter2": "value"
   }
@@ -575,10 +556,10 @@ existing system.
 <pre class="terminal">
 $ curl http://username:password@broker-url/v2/service_instances/:instance_id -d '{
   "organization_guid": "org-guid-here",
-  "plan_id":           "plan-guid-here",
-  "service_id":        "service-guid-here",
-  "space_guid":        "space-guid-here",
-  "parameters":        {
+  "plan_id": "plan-guid-here",
+  "service_id": "service-guid-here",
+  "space_guid": "space-guid-here",
+  "parameters": {
     "parameter1": 1,
     "parameter2": "value"
   }
@@ -599,7 +580,7 @@ In this case, `instance_id` refers to the service instance ID generated by the m
 <tbody>
 <tr>
   <td>201 Created</td>
-  <td>Service instance has been created. The expected response body is below.</td>
+  <td>Service instance has been provisioned. The expected response body is below.</td>
 </tr>
 <tr>
   <td>200 OK</td>
@@ -610,11 +591,11 @@ In this case, `instance_id` refers to the service instance ID generated by the m
 </tr>
 <tr>
   <td>202 Accepted</td>
-  <td>Service instance creation is in progress. This triggers the marketplace to poll the <a href="#polling">Service Instance Last Operation Endpoint</a> for operation status.</td>
+  <td>Service instance provisioning is in progress. This triggers the platform marketplace to poll the <a href="#polling">Service Instance Last Operation Endpoint</a> for operation status.</td>
 </tr>
 <tr>
   <td>409 Conflict</td>
-  <td>Should be returned if the requested service instance already exists. The expected response body is <code>{}</code>.</td>
+  <td>Should be returned if a service instance with the same id already exists but with different attributes. The expected response body is <code>{}</code>.</td>
 </tr>
 <tr>
   <td>422 Unprocessable Entity</td>
@@ -629,7 +610,7 @@ Responses with any other status code will be interpreted as a failure. Brokers c
 
 All response bodies must be a valid JSON Object (`{}`). This is for future compatibility; it will be easier to add fields in the future if JSON is expected rather than to support the cases when a JSON body may or may not be returned.
 
-For success responses, the following fields are supported. Others will be ignored. For error responses, see [Broker Errors](#broker-errors).
+For success responses, a broker may return the following fields. For error responses, see [Broker Errors](#broker-errors).
 
 <table border="1" class="nice">
 <thead>
@@ -643,12 +624,12 @@ For success responses, the following fields are supported. Others will be ignore
 <tr>
   <td>dashboard_url</td>
   <td>string</td>
-  <td>The URL of a web-based management user interface for the service instance; we refer to this as a service dashboard. The URL should contain enough information for the dashboard to identify the resource being accessed ("9189kdfsk0vfnku" in the example below).</td>
+  <td>The URL of a web-based management user interface for the service instance; we refer to this as a service dashboard. The URL should contain enough information for the dashboard to identify the resource being accessed (<code>9189kdfsk0vfnku</code> in the example below).</td>
 </tr>
 <tr>
   <td>operation</td>
   <td>string</td>
-  <td>For asynchronous responses, service brokers can return operation state as a string. This field will be provided back to the service broker on <code>last_operation</code> requests as a URL encoded query param.</a>.</td>
+  <td>For asynchronous responses, service brokers may a return an identifier for the operation. The platform should provide this field when <a href="#polling">Polling Last Operation</a> as a URL encoded query param.</td>
 </tr>
 </tboby>
 </table>
@@ -662,15 +643,11 @@ For success responses, the following fields are supported. Others will be ignore
 
 ## <a id='updating_service_instance'></a>Updating a Service Instance ##
 
-By implementing this endpoint, service broker authors can enable users to modify two attributes of an existing service instance: the service plan and parameters. By changing the service plan, users can upgrade or downgrade their service instance to other plans. By modifying properties, users can change configuration options that are specific to a service or plan. 
+By implementing this endpoint, service broker authors can enable users to modify two attributes of an existing service instance: the service plan and parameters. By changing the service plan, users can upgrade or downgrade their service instance to other plans. By modifying properties, users can change configuration options that are specific to a service or plan.
 
-To enable support for the update of the plan, a broker should declare support per service by including `plan_updateable: true` in its [catalog endpoint](#catalog-mgmt). 
+To enable support for the update of the plan, a broker should declare support per service by including `plan_updateable: true` in its [catalog endpoint](#catalog-mgmt).
 
-If this optional field is not included, the platform should return a meaningful error to users for any plan change request, and should not make an API call to the service broker. 
-
-If this field is included and configured as true, the platform should make API calls to the broker for all plan change requests, and it is up to the broker to validate whether a particular permutation of plan change is supported. 
-
-Not all permutations of plan changes are expected to be supported. For example, a service may support upgrading from plan "shared small" to "shared large" but not to plan "dedicated". If a particular plan change is not supported, the broker should return a meaningful error message in response.
+Not all permutations of plan changes are expected to be supported. For example, a service may support upgrading from plan "shared small" to "shared large" but not to plan "dedicated". It is up to the broker to validate whether a particular permutation of plan change is supported. If a particular plan change is not supported, the broker should return a meaningful error message in response.
 
 ### Request ###
 
@@ -693,17 +670,22 @@ Not all permutations of plan changes are expected to be supported. For example, 
 <tr>
   <td>service_id*</td>
   <td>string</td>
-  <td>The ID of the service within the catalog above.</td>
+  <td>The ID of the service (from the catalog). Must be globally unique.</td>
 </tr>
 <tr>
   <td>plan_id</td>
   <td>string</td>
-  <td>ID of the new plan from the catalog.</td>
+  <td>The ID of the plan (from the catalog) for which the service instance has been requested. Must be unique to a service.</td>
 </tr>
 <tr>
   <td>parameters</td>
   <td>JSON object</td>
-  <td>Platform API clients can provide a JSON object of configuration parameters with their request and this value will be passed through to the service broker. Brokers are responsible for validation.</td>
+  <td>Platforms may provide a JSON object of configuration options obtained from end users. Brokers are responsible for validation.</td>
+</tr>
+<tr>
+  <td>accepts_incomplete</td>
+  <td>boolean</td>
+  <td>A value of true indicates that the marketplace and its clients support asychronous broker operations. If this parameter is not included in the request, and the broker can only provision an instance of the requested plan asynchronously, the broker should reject the request with a 422 as described below.</td>
 </tr>
 <tr>
   <td>previous_values</td>
@@ -711,29 +693,24 @@ Not all permutations of plan changes are expected to be supported. For example, 
   <td>Information about the instance prior to the update.</td>
 </tr>
 <tr>
-  <td>previous_values.plan_id</td>
-  <td>string</td>
-  <td>ID of the plan prior to the update.</td>
-</tr>
-<tr>
   <td>previous_values.service_id</td>
   <td>string</td>
   <td>ID of the service for the instance.</td>
 </tr>
 <tr>
+  <td>previous_values.plan_id</td>
+  <td>string</td>
+  <td>ID of the plan prior to the update.</td>
+</tr>
+<tr>
   <td>previous_values.organization_id</td>
   <td>string</td>
-  <td>ID of the organization containing the instance.</td>
+  <td>ID of the organization specified for the instance.</td>
 </tr>
 <tr>
   <td>previous_values.space_id</td>
   <td>string</td>
-  <td>ID of the space containing the instance..</td>
-</tr>
-<tr>
-  <td>accepts_incomplete</td>
-  <td>boolean</td>
-  <td>A value of true indicates that both the marketplace and the requesting client support asynchronous update. If this parameter is not included in the request, and the broker can only update an instance of the requested plan asynchronously, the broker should reject the request with a 422 as described below.</td>
+  <td>ID of the space specified for the instance.</td>
 </tr>
 </tbody>
 </table>
@@ -744,7 +721,7 @@ Not all permutations of plan changes are expected to be supported. For example, 
 {
   "service_id": "service-guid-here",
   "plan_id": "plan-guid-here",
-  "parameters":        {
+  "parameters": {
     "parameter1": 1,
     "parameter2": "value"
   },
@@ -762,7 +739,7 @@ Not all permutations of plan changes are expected to be supported. For example, 
 $ curl http://username:password@broker-url/v2/service_instances/:instance_id -d '{
   "service_id": "service-guid-here",
   "plan_id": "plan-guid-here",
-  "parameters":        {
+  "parameters": {
     "parameter1": 1,
     "parameter2": "value"
   },
@@ -787,16 +764,16 @@ $ curl http://username:password@broker-url/v2/service_instances/:instance_id -d 
 <tbody>
 <tr>
   <td>200 OK</td>
-  <td>New plan is effective. The expected response body is <code>{}</code>.</td>
+  <td>The requests changes have been applied. The expected response body is <code>{}</code>.</td>
 </tr>
 <tr>
   <td>202 Accepted</td>
-  <td>Service instance update is in progress. This triggers the marketplace to poll the <a href="#polling">Service Instance Last Operation Endpoint</a> for operation status.</td>
+  <td>Service instance update is in progress. This triggers the platform marketplace to poll the <a href="#polling">Service Instance Last Operation Endpoint</a> for operation status.</td>
 </tr>
 <tr>
   <td>422 Unprocessable entity</td>
   <td>
-    May be returned if the particular plan change requested is not supported or if the request cannot currently be fulfilled due to the state of the instance (eg. instance utilization is over the quota of the requested plan). Broker should include a user-facing message in the body; for details see <a href="#broker-errors">Broker Errors</a>.  Additionally, a <code>422</code> can also be returned if the broker only supports asynchronous update for the requested plan and the request did not include <code>?accepts_incomplete=true</code>. The expected response body is: <code>{ "error": "AsyncRequired", "description": "This service plan requires client support for asynchronous service operations." }</code></a>.
+    May be returned if the requested change is not supported or if the request cannot currently be fulfilled due to the state of the instance (e.g. instance utilization is over the quota of the requested plan). Broker should include a user-facing message in the body; for details see <a href="#broker-errors">Broker Errors</a>.  Additionally, a 422 can also be returned if the broker only supports asynchronous update for the requested plan and the request did not include <code>?accepts_incomplete=true</code>; in this case the expected response body is: <code>{ "error": "AsyncRequired", "description": "This service plan requires client support for asynchronous service operations." }</code>.
   </td>
 </tr>
 </tbody>
@@ -808,7 +785,7 @@ Responses with any other status code will be interpreted as a failure. Brokers c
 
 All response bodies must be a valid JSON Object (`{}`). This is for future compatibility; it will be easier to add fields in the future if JSON is expected rather than to support the cases when a JSON body may or may not be returned.
 
-For success responses, the following fields are supported. Others will be ignored. For error responses, see [Broker Errors](#broker-errors).
+For success responses, a broker may return the following field. Others will be ignored. For error responses, see [Broker Errors](#broker-errors).
 
 <table border="1" class="nice">
 <thead>
@@ -822,7 +799,7 @@ For success responses, the following fields are supported. Others will be ignore
 <tr>
   <td>operation</td>
   <td>string</td>
-  <td>For asynchronous responses, service brokers can return operation state as a string. This field will be provided back to the service broker on `last_operation` requests as a URL encoded query parameter.</a>.</td>
+  <td>For asynchronous responses, service brokers may a return an identifier for the operation. The platform should provide this field when <a href="#polling">Polling Last Operation</a> as a URL encoded query param.</td>
 </tr>
 </tboby>
 </table>
@@ -842,21 +819,21 @@ For success responses, the following fields are supported. Others will be ignore
 
 #### <a id='binding-credentials'></a>Credentials ####
 
-Credentials are a set of information used by an application or a user to utilize the service instance. If `bindable:true` is declared for a service in the catalog endpoint, users may request generation of credentials either by binding the service instance to an application or by creating a service key. When a service instance is bound to an app, the platform will send the app ID with the request. When a service key is created, the app ID is not included. If the broker supports generation of credentials it should return `credentials` in the response. Credentials should be unique whenever possible, so access can be revoked for one application or user without affecting another. 
+Credentials are a set of information used by an application or a user to utilize the service instance. If `bindable:true` is declared for a service in the catalog endpoint, users may request generation of credentials either by binding the service instance to an application or by creating a service key. When a service instance is bound to an app, the platform will send the app ID with the request. When a service key is created, the app ID is not included. If the broker supports generation of credentials it should return `credentials` in the response. Credentials should be unique whenever possible, so access can be revoked for one application or user without affecting another.
 
 #### <a id='binding-syslog-drain'></a>Application Log Streaming ####
 
-In response to a bind request for an application (`app_id` included), a broker may also enable streaming of application logs from the platform to a consuming service instance by returning `syslog_drain_url`. 
+In response to a bind request for an application (`app_id` included), a broker may also enable streaming of application logs from the platform to a consuming service instance by returning `syslog_drain_url`.
 
 #### <a id='binding-route-services'></a>Route Services ####
 
-If a broker has declared `"requires":["route_forwarding"]` for a service in the catalog endpoint, the platform should permit a user to bind a service to a route. 
+If a broker has declared `"requires":["route_forwarding"]` for a service in the catalog endpoint, the platform should permit a user to bind a service to a route.
 
-When bound to a route, the route itself will be sent with the bind request. A route is an address used by clients to reach apps mapped to the route. In response a broker may return a `route_service_url` which the platform will use to proxy any request for the route to the service instance at URL specified by `route_service_url`. A broker may declare `"requires":["route_forwarding"]` but not return `route_service_url`. This enables a broker to dynamically configure a network component already in the request path for the route, requiring no change in the platform router. 
+When bound to a route, the route itself will be sent with the bind request. A route is an address used by clients to reach apps mapped to the route. In response a broker may return a `route_service_url` which the platform will use to proxy any request for the route to the service instance at URL specified by `route_service_url`. A broker may declare `"requires":["route_forwarding"]` but not return `route_service_url`. This enables a broker to dynamically configure a network component already in the request path for the route, requiring no change in the platform router.
 
 #### <a id='binding-volume-services'></a>Volume Services (Experimental)####
 
-If a broker has declared `"requires":["volume_mount"]` for a service in the catalog endpoint, the platform should permit a user to bind one or more volumes to an application. In response to a bind request a volume service broker should return a set of `volume_mount` instructions that the platform should ensure are mounted into the application's containers. 
+If a broker has declared `"requires":["volume_mount"]` for a service in the catalog endpoint, the platform should permit a user to bind one or more volumes to an application. In response to a bind request a volume service broker should return a set of `volume_mount` instructions that the platform should ensure are mounted into the application's containers.
 
 ### Request ###
 
