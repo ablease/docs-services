@@ -1,5 +1,5 @@
 ---
-title: Service Broker API v2.10
+title: Service Broker API v2.11
 owner: Services API
 ---
 <strong><%= modified_date %></strong>
@@ -23,9 +23,9 @@ added to enable support for new features.
 These fields must be optional and should be ignored by clients and servers
 that do not understand them.
 
-### <a id='api-changes-since-v2-9'></a>Changes Since v2.9 ###
+### <a id='api-changes-since-v2-10'></a>Changes Since v2.10 ###
 
-* Backward incompatible changes to experimental `volume_mounts` field in service bind response.
+* Add <tt>bindable</tt> field to <a href="#PObject">Plan Object</a> to allow services to have both bindable and non-bindable plans.
 
 ## <a id='overview'></a>API Overview ##
 
@@ -43,10 +43,10 @@ A platform marketplace may expose services from one or many service brokers, and
 
 Requests from the platform to the service broker must contain a header that declares the version number of the Service Broker API that the marketplace will use:
 
-`X-Broker-Api-Version: 2.10`
+`X-Broker-Api-Version: 2.11`
 
 The version numbers are in the format `MAJOR.MINOR`, using semantic versioning
-such that 2.9 comes before 2.10.
+such that 2.10 comes before 2.11.
 
 This header allows brokers to reject requests from marketplaces for versions they do not support. While minor API revisions will always be additive, it is possible that brokers depend on a feature from a newer version of the API that is supported by the platform. In this scenario the broker may reject the request with `412 Precondition Failed` and provide a message that informs the operator of the required API version.
 
@@ -74,7 +74,7 @@ The following sections describe catalog requests and responses in the Service Br
 
 #### cURL ####
 <pre class="terminal">
- $ curl -H "X-Broker-API-Version: 2.10" http://username:password@broker-url/v2/catalog
+ $ curl -H "X-Broker-API-Version: 2.11" http://username:password@broker-url/v2/catalog
 </pre>
 
 ### Response ###
@@ -153,7 +153,7 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 <tr>
   <td>&nbsp;&nbsp;&nbsp;requires</td>
   <td>array-of-strings</td>
-  <td>A list of permissions that the user would have to give the service, if they provision it. The only permissions currently supported are <tt>syslog_drain</tt>, <tt>route_forwarding</tt> and <tt>volume_mount</tt>.</td>
+  <td>A list of permissions that the user would have to give the service, if they provision it. The only permissions currently supported are <code>syslog_drain</code>, <code>route_forwarding</code> and <code>volume_mount</code>.</td>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;max_db_per_node:</td>
   <td>strings</td>
@@ -161,7 +161,7 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 <tr>
   <td>&nbsp;&nbsp;&nbsp;bindable*</td>
   <td>boolean</td>
-  <td>Whether the service can be bound to applications.</td>
+  <td>Specifies whether instances of the service can be bound to applications. This specifies the default for all plans of this service. Plans can override this field (see <a href="#PObject">Plan Object</a>).</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;metadata</td>
@@ -179,7 +179,7 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
   <td>
     Whether the service supports upgrade/downgrade for some plans.
     <br/>
-    Please note that the misspelling of the attribute <i>plan_updatable</i> to <i>plan_updateable</i> was done by mistake. We have opted to keep that misspelling instead of fixing it and thus breaking backward compatibility.
+    Please note that the misspelling of the attribute <code>plan_updatable</code> to <code>plan_updateable</code> was done by mistake. We have opted to keep that misspelling instead of fixing it and thus breaking backward compatibility.
   </td>
 </tr>
 <tr>
@@ -204,7 +204,7 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
 <tr>
   <td>&nbsp;&nbsp;&nbsp;id</td>
   <td>string</td>
-  <td>The id of the Oauth2 client that the service intends to use. The name may be taken, in which case the update will return an error to the operator</td>
+  <td>The id of the Oauth 2 client that the service intends to use. The name may be taken, in which case the update will return an error to the operator</td>
 </tr>
 <tr>
   <td>&nbsp;&nbsp;&nbsp;secret</td>
@@ -255,6 +255,11 @@ A web-friendly display name is camel-cased with spaces and punctuation supported
   <td>&nbsp;&nbsp;&nbsp;free</td>
   <td>boolean</td>
   <td>When false, instances of this plan have a cost. The default is true</td>
+</tr>
+<tr>
+  <td>&nbsp;&nbsp;&nbsp;bindable</td>
+  <td>boolean</td>
+  <td>Specifies whether instances of the service plan can be bound to applications. This field is optional. If specified, this takes precedence over the <tt>bindable</tt> attribute of the service. If not specified, the default is derived from the service.</td>
 </tr>
 </tbody>
 </table>
@@ -351,7 +356,7 @@ Brokers that support sychronous responses for provision, update, and delete can 
 
 ###<a id='async'></a> Asynchronous Operations
 
-<p class='note'><strong>Note:</strong> Asynchronous Operations are currently supported only for provision, update, and deprovision.</p>
+<p class='note'><strong>Note:</strong> Asynchronous operations are currently supported only for provision, update, and deprovision.</p>
 
 For a broker to return an asynchronous response, the query parameter `accepts_incomplete=true` must be included the request. If the parameter is not included or is set to `false`, and the broker cannot fulfill the request synchronously (guaranteeing that the operation is complete on response), then the broker should reject the request with the status code `422 UNPROCESSABLE ENTITY` and the following body:
 
@@ -368,7 +373,7 @@ An asynchronous response triggers the platform marketplace to poll the endpoint 
 
 #### <a id='blocking'></a>Blocking Operations ####
 
-The marketplace must ensure that service brokers do not receive requests for an instance while an asynchronous operation is in progress. For example, if a broker is in the process of provisioning an instance asynchronously, the marketplace must not allow any update, bind, unbind, or deprovision requests to be made through the platform. A user who attempts to perform one of these actions while an operation is already in progress must receive an HTTP 400 response with the error message "Another operation for this service instance is in progress."
+The marketplace must ensure that service brokers do not receive requests for an instance while an asynchronous operation is in progress. For example, if a broker is in the process of provisioning an instance asynchronously, the marketplace must not allow any update, bind, unbind, or deprovision requests to be made through the platform. A user who attempts to perform one of these actions while an operation is already in progress must receive an HTTP 400 response with the error message: `Another operation for this service instance is in progress`.
 
 ## <a id='polling'></a>Polling Last Operation ##
 
@@ -407,7 +412,7 @@ The request provides these query string parameters as useful hints for brokers.
 <tr>
   <td>operation</td>
   <td>string</td>
-  <td>When returned by the service broker with asynchronous responses for <code>provision</code>, <code>update</code>, <code>deprovision</code>, the platform marketplace should provide that value with this field as a URL-encoded string.</td>
+  <td>A broker-provided identifier for the operation. When a value for <code>operation</code> is included with asynchronous responses for <a href="#provisioning">Provision</a>, <a href="#updating_service_instance">Update</a>, and <a href="#deprovisioning">Deprovision</a> requests, the broker client should provide the same value using this query parameter as a URL-encoded string.</td>
 </tr>
 </tbody>
 </table>
@@ -491,7 +496,7 @@ When the broker receives a provision request from the platform, it should take w
 ##### Route #####
 `PUT /v2/service_instances/:instance_id`
 
-<p class="note"><strong>Note</strong>: The <code>:instance_id</code> of a service instance is provided by the platform marketplace. This ID will be used for subsequent operations on the service instance (bind and deprovision), so the broker must use it to identify the service instance it provisions.</p>
+The `:instance_id` of a service instance is provided by the platform. This ID will be used for future requests (bind and deprovision), so the broker must use it to correlate the resource it creates.
 
 ##### Body #####
 
@@ -517,7 +522,7 @@ When the broker receives a provision request from the platform, it should take w
 <tr>
   <td>parameters</td>
   <td>JSON object</td>
-  <td>Platforms may provide a JSON object of configuration options obtained from end users. Brokers are responsible for validation.</td>
+  <td>Configuration options for the service instance.</td>
 </tr>
 <tr>
   <td>accepts_incomplete</td>
@@ -541,13 +546,13 @@ When the broker receives a provision request from the platform, it should take w
 
 <pre class="terminal">
 {
-  "organization_guid": "org-guid-here",
-  "plan_id": "plan-guid-here",
   "service_id": "service-guid-here",
+  "plan_id": "plan-guid-here",
+  "organization_guid": "org-guid-here",
   "space_guid": "space-guid-here",
   "parameters": {
     "parameter1": 1,
-    "parameter2": "value"
+    "parameter2": "foo"
   }
 }
 </pre>
@@ -555,18 +560,16 @@ When the broker receives a provision request from the platform, it should take w
 ##### cURL #####
 <pre class="terminal">
 $ curl http://username:password@broker-url/v2/service_instances/:instance_id -d '{
-  "organization_guid": "org-guid-here",
-  "plan_id": "plan-guid-here",
   "service_id": "service-guid-here",
+  "plan_id": "plan-guid-here",
+  "organization_guid": "org-guid-here",
   "space_guid": "space-guid-here",
   "parameters": {
     "parameter1": 1,
-    "parameter2": "value"
+    "parameter2": "foo"
   }
-}' -X PUT -H "X-Broker-API-Version: 2.10" -H "Content-Type: application/json"
+}' -X PUT -H "X-Broker-API-Version: 2.11" -H "Content-Type: application/json"
 </pre>
-
-In this case, `instance_id` refers to the service instance ID generated by the marketplace.
 
 ### Response ###
 
@@ -629,14 +632,14 @@ For success responses, a broker may return the following fields. For error respo
 <tr>
   <td>operation</td>
   <td>string</td>
-  <td>For asynchronous responses, service brokers may a return an identifier for the operation. The platform should provide this field when <a href="#polling">Polling Last Operation</a> as a URL encoded query param.</td>
+  <td>For asynchronous responses, service brokers may return an identifier representing the operation. The value of this field should be provided by the broker client with requests to the <a href="#polling">Last Operation</a> endpoint in a URL encoded query parameter.</td>
 </tr>
 </tboby>
 </table>
 \* Fields with an asterisk are required.
 <pre class="terminal">
 {
- "dashboard\_url": "http://example-dashboard.example.com/9189kdfsk0vfnku",
+ "dashboard\_url": "<span>http</span>://example-dashboard.example.com/9189kdfsk0vfnku",
  "operation": "task\_10"
 }
 </pre>
@@ -654,7 +657,7 @@ Not all permutations of plan changes are expected to be supported. For example, 
 ##### Route #####
 `PATCH /v2/service_instances/:instance_id`
 
-<p class="note"><strong>Note</strong>: <code>:instance_id</code> is the global unique ID of a previously-provisioned service instance.</p>
+`:instance_id` is the global unique ID of a previously-provisioned service instance.
 
 ##### Body #####
 
@@ -680,7 +683,7 @@ Not all permutations of plan changes are expected to be supported. For example, 
 <tr>
   <td>parameters</td>
   <td>JSON object</td>
-  <td>Platforms may provide a JSON object of configuration options obtained from end users. Brokers are responsible for validation.</td>
+  <td>Configuration options for the service instance.</td>
 </tr>
 <tr>
   <td>accepts_incomplete</td>
@@ -723,7 +726,7 @@ Not all permutations of plan changes are expected to be supported. For example, 
   "plan_id": "plan-guid-here",
   "parameters": {
     "parameter1": 1,
-    "parameter2": "value"
+    "parameter2": "foo"
   },
   "previous_values": {
     "plan_id": "old-plan-guid-here",
@@ -741,7 +744,7 @@ $ curl http://username:password@broker-url/v2/service_instances/:instance_id -d 
   "plan_id": "plan-guid-here",
   "parameters": {
     "parameter1": 1,
-    "parameter2": "value"
+    "parameter2": "foo"
   },
   "previous_values": {
     "plan_id": "old-plan-guid-here",
@@ -749,7 +752,7 @@ $ curl http://username:password@broker-url/v2/service_instances/:instance_id -d 
     "organization_id": "org-guid-here",
     "space_id": "space-guid-here"
   }
-}' -X PATCH -H "X-Broker-API-Version: 2.10" -H "Content-Type: application/json"
+}' -X PATCH -H "X-Broker-API-Version: 2.11" -H "Content-Type: application/json"
 </pre>
 
 ### Response ###
@@ -799,7 +802,7 @@ For success responses, a broker may return the following field. Others will be i
 <tr>
   <td>operation</td>
   <td>string</td>
-  <td>For asynchronous responses, service brokers may a return an identifier for the operation. The platform should provide this field when <a href="#polling">Polling Last Operation</a> as a URL encoded query param.</td>
+  <td>For asynchronous responses, service brokers may return an identifier representing the operation. The value of this field should be provided by the broker client with requests to the <a href="#polling">Last Operation</a> endpoint in a URL encoded query parameter.</td>
 </tr>
 </tboby>
 </table>
@@ -813,37 +816,43 @@ For success responses, a broker may return the following field. Others will be i
 
 ## <a id='binding'></a>Binding ##
 
+If `bindable:true` is declared for a service or plan in the [Catalog](#catalog-mgmt) endpoint, broker clients may request generation of a service binding. 
+
 <p class="note"><strong>Note</strong>: Not all services must be bindable --- some deliver value just from being provisioned. Brokers that offer services that are bindable should declare them as such using <code>bindable: true</code> in the <a href="#catalog-mgmt">Catalog</a>. Brokers that do not offer any bindable services do not need to implement the endpoint for bind requests.</p>
 
 ### <a id='binding-types'></a>Types of Binding ###
 
 #### <a id='binding-credentials'></a>Credentials ####
 
-Credentials are a set of information used by an application or a user to utilize the service instance. If `bindable:true` is declared for a service in the catalog endpoint, users may request generation of credentials either by binding the service instance to an application or by creating a service key. When a service instance is bound to an app, the platform will send the app ID with the request. When a service key is created, the app ID is not included. If the broker supports generation of credentials it should return `credentials` in the response. Credentials should be unique whenever possible, so access can be revoked for one application or user without affecting another.
+Credentials are a set of information used by an application or a user to utilize the service instance. If the broker supports generation of credentials it should return `credentials` in the response for a request to create a service binding. Credentials should be unique whenever possible, so access can be revoked for each binding without affecting consumers of other bindings for the service instance. 
 
-#### <a id='binding-syslog-drain'></a>Application Log Streaming ####
+#### <a id='binding-syslog-drain'></a>Log Drain ####
 
-In response to a bind request for an application (`app_id` included), a broker may also enable streaming of application logs from the platform to a consuming service instance by returning `syslog_drain_url`.
+There are a class of service offerings that provide aggregation, indexing, and analysis of log data. To utilize these services an application that generates logs needs information for the location to which it should stream logs. If a broker represents one of these services, it may optionally return a `syslog_drain_url` in the response for a request to create a service binding, to which logs may be streamed.  
+
+The `requires` field in the [Catalog](#catalog-mgmt) endpoint enables a platform marketplace to validate a response for create binding that includes a `syslog_drain_url`. Platform marketplaces should consider a broker's response invalid if it includes a `syslog_drain_url` and `"requires":["syslog_drain"]` is not present in the [Catalog](#catalog-mgmt) endpoint.
 
 #### <a id='binding-route-services'></a>Route Services ####
 
-If a broker has declared `"requires":["route_forwarding"]` for a service in the catalog endpoint, the platform should permit a user to bind a service to a route.
+There are a class of service offerings that intermediate requests to applications, performing functions such as rate limiting or authorization. To configure a service instance with behavior specific to an application's routable address, a broker client may send the address along with the request to create a binding using `"bind_resource":{"route":"some-address.com"}`.
 
-When bound to a route, the route itself will be sent with the bind request. A route is an address used by clients to reach apps mapped to the route. In response a broker may return a `route_service_url` which the platform will use to proxy any request for the route to the service instance at URL specified by `route_service_url`. A broker may declare `"requires":["route_forwarding"]` but not return `route_service_url`. This enables a broker to dynamically configure a network component already in the request path for the route, requiring no change in the platform router.
+Some platforms may support proxying of application requests to service instances. In this case the platform needs to know where to send application requests; to facilitate this, the broker may return a `route_service_url` in the response for a request to create a binding. Not all services of this type expect to receive requests proxied by the platform; some services will have been configured out-of-band to intermediate requests to applications. In this case, the broker will not return `route_service_url` in response to the create binding request. By sending `bind-resource` as described above, the platform enables dynamic configuration of a service instance already in the application request path for the route, requiring no change in the platform routing tier. 
 
-#### <a id='binding-volume-services'></a>Volume Services (Experimental)####
+The `requires` field in the [Catalog](#catalog-mgmt) endpoint enables a platform marketplace to validate requests to create bindings. A platform may opt to reject requests to create bindings when a broker has declared `"requires":["route_forwarding"]` for a service in the catalog endpoint.
 
-If a broker has declared `"requires":["volume_mount"]` for a service in the catalog endpoint, the platform should permit a user to bind one or more volumes to an application. In response to a bind request a volume service broker should return a set of `volume_mount` instructions that the platform should ensure are mounted into the application's containers.
+#### <a id='binding-volume-services'></a>Volume Services ####
+
+There are a class of services that provide network storage to applications via volume mounts in the application container. A service broker may return data required for this configuration with `volume_mount` in response to the request to create a binding. 
+
+The `requires` field in the [Catalog](#catalog-mgmt) endpoint enables a platform marketplace to validate a response for create binding that includes a `volume_mounts`. Platform marketplaces should consider a broker's response invalid if it includes a `volume_mounts` and `"requires":["volume_mount"]` is not present in the [Catalog](#catalog-mgmt) endpoint.
 
 ### Request ###
 
 ##### Route #####
 `PUT /v2/service_instances/:instance_id/service_bindings/:binding_id`
 
-<p class="note"><strong>Note</strong>: The <code>:binding_id</code> of a service binding is provided by the marketplace.
-<code>:instance_id</code> is the ID of a previously-provisioned service instance; <code>:binding_id</code>
-will be used for future unbind requests, so the broker must use it to correlate
-the resource it creates.</p>
+The `:instance_id` is the ID of a previously-provisioned service instance. The `:binding_id` is also provided by the platform. This ID will be used for future unbind requests, so the broker must use it to correlate
+the resource it creates.
 
 ##### Body #####
 
@@ -869,17 +878,17 @@ the resource it creates.</p>
 <tr>
   <td>app_guid</td>
   <td>string</td>
-  <td>GUID of the application that you want to bind your service to. Will be included when users bind applications to service instances.</td>
+  <td>Deprecated in favor of <code>bind_resource.app_guid</code>. GUID of an application associated with the binding to be created.</td>
 </tr>
 <tr>
   <td>bind_resource</td>
   <td>JSON object</td>
-  <td>A JSON object that contains the required fields of the resource being bound. Currently only <code>app_guid</code> for application bindings and <code>route</code> for route bindings are supported.</td>
+  <td>A JSON object that contains data for platform resources associated with the binding to be created. Current valid values include <code>app_guid</code> for <a href="#binding-credentials">credentials</a> and <code>route</code> for <a href="#binding-route-services">route services</a>.</td>
 </tr>
 <tr>
   <td>parameters</td>
   <td>JSON object</td>
-  <td>Platform API clients can provide a JSON object of configuration parameters with their request and this value will be passed through to the service broker. Brokers are responsible for validation.</td>
+  <td>Configuration options for the service binding.</td>
 </tr>
 </tbody>
 </table>
@@ -888,64 +897,33 @@ the resource it creates.</p>
 
 <pre class="terminal">
 {
-  "plan_id":      "plan-guid-here",
-  "service_id":   "service-guid-here",
-  "app_guid":     "app-guid-here",
-  "bind_resource":     {
+  "service_id": "service-guid-here",
+  "plan_id": "plan-guid-here",
+  "bind_resource": {
     "app_guid": "app-guid-here"
   },
-  "parameters":        {
+  "parameters": {
     "parameter1-name-here": 1,
     "parameter2-name-here": "parameter2-value-here"
   }
 }
 </pre>
 
-<pre class="terminal">
-{
-  "plan_id":      "plan-guid-here",
-  "service_id":   "service-guid-here",
-  "bind_resource":     {
-    "route": "route-url-here"
-  },
-  "parameters":        {
-    "parameter1-name-here": 1,
-    "parameter2-name-here": "parameter2-value-here"
-  }
-}
-</pre>
 
 ##### cURL #####
 <pre class="terminal">
 $ curl http://username:password@broker-url/v2/service_instances/:instance_id/service_bindings/:binding_id -d '{
-  "plan_id":      "plan-guid-here",
-  "service_id":   "service-guid-here",
-  "app_guid":     "app-guid-here",
-  "bind_resource":     {
+  "service_id": "service-guid-here",
+  "plan_id": "plan-guid-here",
+  "bind_resource": {
     "app_guid": "app-guid-here"
   },
-  "parameters":        {
+  "parameters": {
     "parameter1-name-here": 1,
     "parameter2-name-here": "parameter2-value-here"
   }
 }' -X PUT
 </pre>
-
-<pre class="terminal">
-$ curl http://username:password@broker-url/v2/service_instances/:instance_id/service_bindings/:binding_id -d '{
-  "plan_id":      "plan-guid-here",
-  "service_id":   "service-guid-here",
-  "bind_resource":     {
-    "route": "route-url-here"
-  },
-  "parameters":        {
-    "parameter1-name-here": 1,
-    "parameter2-name-here": "parameter2-value-here"
-  }
-}' -X PUT
-</pre>
-
-In this case, `instance_id` refers to the id of an existing service instance in a previous provisioning, while `binding_id` is service binding ID generated by the marketplace.
 
 ### Response ###
 
@@ -999,22 +977,22 @@ For success responses, the following fields are supported. Others will be ignore
 <tr>
   <td>credentials</td>
   <td>object</td>
-  <td>A free-form hash of credentials that the bound application can use to access the service. For more information, see <a href="binding-credentials.html">Binding Credentials</a>.</td>
+  <td>A free-form hash of credentials that may be used by applications or users to access the service.</td>
 </tr>
 <tr>
   <td>syslog_drain_url</td>
   <td>string</td>
-  <td>A URL to which the platform should drain logs for the bound application. <code>requires:syslog_drain</code> must be declared in the <a href="#catalog-mgmt">catalog endpoint</a> or the platform will consider the response invalid.</td>
+  <td>A URL to which logs may be streamed. <code>"requires":["syslog_drain"]</code> must be declared in the <a href="#catalog-mgmt">Catalog</a> endpoint or the platform should consider the response invalid.</td>
 </tr>
 <tr>
   <td>route_service_url</td>
   <td>string</td>
-  <td>A URL to which the platform should proxy requests for the bound route. <code>requires:route_forwarding</code> must be declared in the <a href="#catalog-mgmt">catalog endpoint</a> or the platform should consider the response invalid.</td>
+  <td>A URL to which the platform may proxy requests for the address sent with <code>bind_resource.route</code> in the request body. <code>"requires":["route_forwarding"]</code> must be declared in the <a href="#catalog-mgmt">Catalog</a> endpoint or the platform should consider the response invalid.</td>
 </tr>
 <tr>
   <td>volume_mounts</td>
   <td>array-of-objects</td>
-  <td>An array of volume mount instructions. <code>requires:volume_mount</code> must be declared in the <a href="#catalog-mgmt">catalog endpoint</a> or the platform should consider the response invalid.</td>
+  <td>An array of configuration for mounting volumes. <code>"requires":["volume_mount"]</code> must be declared in the <a href="#catalog-mgmt">Catalog</a> endpoint or the platform should consider the response invalid.</td>
 </tr>
 </tbody>
 </table>
@@ -1034,18 +1012,16 @@ For success responses, the following fields are supported. Others will be ignore
 
 ## <a id='unbinding'></a>Unbinding ##
 
-<p class="note"><strong>Note</strong>: Brokers that do not provide any bindable services do not need to implement the endpoint for unbind requests.</p>
+<p class="note"><strong>Note</strong>: Brokers that do not provide any bindable services or plans do not need to implement this endpoint.</p>
 
-When a broker receives an unbind request from the marketplace, it should
-delete any resources it created in bind.
-Usually this means that an application immediately cannot access the resource.
+When a broker receives an unbind request from the marketplace, it should delete any resources associated with the binding. In the case where credentials were generated, this may result in requests to the service instance failing to authenticate.
 
 ### Request ###
 
 ##### Route #####
 `DELETE /v2/service_instances/:instance_id/service_bindings/:binding_id`
 
-The `:binding_id` in the URL is the identifier of a previously created binding (the same `:binding_id` passed in the bind request). The request has no body, because DELETE requests generally do not have bodies.
+The `:instance_id` is the ID of a previously-provisioned service instance. The `:binding_id` is the ID of a previously provisioned binding for that instance.
 
 ##### Parameters #####
 
@@ -1078,7 +1054,7 @@ The request provides these query string parameters as useful hints for brokers.
 ##### cURL #####
 <pre class="terminal">
 $ curl 'http://username:password@broker-url/v2/service_instances/:instance_id/
-  service_bindings/:binding_id?service_id=service-id-here&plan_id=plan-id-here' -X DELETE -H "X-Broker-API-Version: 2.10"
+  service_bindings/:binding_id?service_id=service-id-here&plan_id=plan-id-here' -X DELETE -H "X-Broker-API-Version: 2.11"
 </pre>
 
 ### Response ###
@@ -1122,9 +1098,7 @@ provisions.
 ##### Route #####
 `DELETE /v2/service_instances/:instance_id`
 
-The `:instance_id` in the URL is the identifier of a previously provisioned instance (the same
-`:instance_id` passed in the provision request).  The request has no body, because DELETE
-requests generally do not have bodies.
+`:instance_id` is the identifier of a previously provisioned instance.
 
 ##### Parameters #####
 
@@ -1162,7 +1136,7 @@ The request provides these query string parameters as useful hints for brokers.
 ##### cURL #####
 <pre class="terminal">
 $ curl 'http://username:password@broker-url/v2/service_instances/:instance_id?service_id=
-    service-id-here&plan_id=plan-id-here' -X DELETE -H "X-Broker-API-Version: 2.10"
+    service-id-here&plan_id=plan-id-here' -X DELETE -H "X-Broker-API-Version: 2.11"
 </pre>
 
 ### Response ###
@@ -1214,7 +1188,7 @@ For success responses, the following fields are supported. Others will be ignore
 <tr>
   <td>operation</td>
   <td>string</td>
-  <td>For async responses, service brokers can return operation state as a string. This field will be provided back to the service broker on `last_operation` requests as a URL encoded query param.</a>.</td>
+  <td>For asynchronous responses, service brokers may return an identifier representing the operation. The value of this field should be provided by the broker client with requests to the <a href="#polling">Last Operation</a> endpoint in a URL encoded query parameter.</td>
 </tr>
 </tboby>
 </table>
@@ -1251,7 +1225,7 @@ For error responses, the following fields are valid. Others will be ignored. If 
 <tr>
   <td>description</td>
   <td>string</td>
-  <td>An error message explaining why the request failed. This message will be displayed to the user who initiated the request.
+  <td>A meaningful error message explaining why the request failed.
 </td>
 </tr>
 </tbody>
@@ -1259,43 +1233,43 @@ For error responses, the following fields are valid. Others will be ignored. If 
 
 <pre class="terminal">
 {
-  "description": "Something went wrong. Please contact support at http://support.example.com."
+  "description": "Your account has exceeded its quota for service instances. Please contact support at http://support.example.com."
 }
 </pre>
 
 ## <a id='orphans'></a>Orphans ##
 
-The marketplace is the source of truth for service instances and bindings. Service brokers are expected to have successfully provisioned all the instances and bindings that the marketplace knows about, and none that it doesn't.
+The platform marketplace is the source of truth for service instances and bindings. Service brokers are expected to have successfully provisioned all the instances and bindings that the marketplace knows about, and none that it doesn't.
 
-Orphans can result if the broker does not return a response before a request from the marketplace times out (typically 60 seconds). For example, if a broker does not return a response to a provision request before the marketplace times out, the broker might eventually succeed in provisioning an instance after the marketplace considers the request a failure. This results in an orphan instance on the service side.
+Orphans can result if the broker does not return a response before a request from the marketplace times out (typically 60 seconds). For example, if a broker does not return a response to a provision request before the request times out, the broker might eventually succeed in provisioning an instance after the marketplace considers the request a failure. This results in an orphan instance on the broker's side.
 
-To mitigate orphan instances and bindings, the marketplace should attempt to delete resources it cannot be sure were successfully created, and will keep trying to delete them until the broker responds with a success.
+To mitigate orphan instances and bindings, the marketplace should attempt to delete resources it cannot be sure were successfully created, and should keep trying to delete them until the broker responds with a success. 
 
-More specifically, when a provision or bind request to the broker fails, the marketplace should immediately send a corresponding delete or unbind request. If the delete or unbind request fails, the marketplace will retry the delete or unbind request ten times with an exponential back-off schedule, over a period of 34 hours.
+Platforms should initiate orphan mitigation in the following scenarios:
 
 <table border="1" class="nice">
 <thead>
 <tr>
-  <th>Status code</th>
-  <th>Result</th>
-  <th>Orphan mitigation</th>
+  <th>Status code of broker response</th>
+  <th>Platform interpretation of response</th>
+  <th>Platform initiates orphan mitigation?</th>
 </tr>
 </thead>
 <tbody>
 <tr>
   <td>200</td>
   <td>Success</td>
-  <td></td>
+  <td>No</td>
 </tr>
 <tr>
   <td>200 with malformed response</td>
   <td>Failure</td>
-  <td></td>
+  <td>No</td>
 </tr>
 <tr>
   <td>201</td>
   <td>Success</td>
-  <td></td>
+  <td>No</td>
 </tr>
 <tr>
   <td>201 with malformed response</td>
@@ -1314,8 +1288,8 @@ More specifically, when a provision or bind request to the broker fails, the mar
 </tr>
 <tr>
   <td>All other 4xx</td>
-  <td>Broker rejects request</td>
-  <td></td>
+  <td>Broker rejected request</td>
+  <td>No</td>
 </tr>
 <tr>
   <td>5xx</td>
@@ -1330,4 +1304,4 @@ More specifically, when a provision or bind request to the broker fails, the mar
 </tbody>
 </table>
 
-If the marketplace encounters an internal error provisioning an instance or binding (for example, saving to the database fails), then the marketplace should send a single delete or unbind request to the service broker but not retry.
+If the platform marketplace encounters an internal error provisioning an instance or binding (for example, saving to the database fails), then it should at least send a single delete or unbind request to the service broker to prevent creation of an orphan.
