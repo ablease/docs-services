@@ -25,7 +25,7 @@
 ## <a id="release-notes"></a>API Release Notes ##
 [Service Broker API Release Notes](release-notes.html)
 
-## <a id="changes"</a> Changes 
+## <a id="changes"</a> Changes ##
 
 ### <a id="change-policy"</a>Change Policy 
 
@@ -36,9 +36,9 @@ added to enable support for new features.
 These fields must be optional and should be ignored by clients and servers
 that do not understand them.
 
-### <a id="since-v2.10"</a> Changes Since v2.10 
+### <a id="since-v2.10"</a>Changes Since v2.10 ###
 
-* Add <tt>bindable</tt> field to <a href="#PObject">Plan Object</a> to allow services to have both bindable and non-bindable plans.
+* Add <tt>bindable</tt> field to [Plan Object](#PObject) to allow services to have both bindable and non-bindable plans.
 
 ## <a id="api-overview"</a> API Overview 
 
@@ -274,7 +274,7 @@ The request provides these query string parameters as useful hints for brokers.
 |---|---|---|
 | service_id  |  string | ID of the service from the catalog.  |
 | plan_id  | string  | ID of the plan from the catalog.  |
-| operation  |  string | A broker-provided identifier for the operation. When a value for <code>operation</code> is included with asynchronous responses for <a href="#provisioning">Provision</a>, <a href="#updating_service_instance">Update</a>, and <a href="#deprovisioning">Deprovision</a> requests, the broker client should provide the same value using this query parameter as a URL-encoded string.  |
+| operation  |  string | A broker-provided identifier for the operation. When a value for <code>operation</code> is included with asynchronous responses for [Provision](#provisioning), Update(#updating_service_instance), and Deprovision(#deprovisioning) requests, the broker client should provide the same value using this query parameter as a URL-encoded string.  |
 
 <p class="note"><strong>Note:</strong> Although the request query parameters <code>service_id</code> and <code>plan_id</code> are not required, the platform should include them on all <code>last_operation</code> requests it makes to service brokers.</p>
 
@@ -371,7 +371,7 @@ $ curl http://username:password@broker-url/v2/service_instances/:instance_id -d 
 |---|---|
 | 201 Created  | Service instance has been provisioned. The expected response body is below.  |
 | 200 OK  |  May be returned if the service instance already exists and the requested parameters are identical to the existing service instance. The expected response body is below. |
-| 202 Accepted  | Service instance provisioning is in progress. This triggers the platform marketplace to poll the <a href="#polling">Service Instance Last Operation Endpoint</a> for operation status.  |
+| 202 Accepted  | Service instance provisioning is in progress. This triggers the platform marketplace to poll the [Service Instance Last Operation Endpoint](#polling) for operation status.  |
 | 409 Conflict  | Should be returned if a service instance with the same id already exists but with different attributes. The expected response body is <code>{}</code>.  |
 | 422 Unprocessable Entity  | Should be returned if the broker only supports asynchronous provisioning for the requested plan and the request did not include <code>?accepts_incomplete=true</code>. The expected response body is: <code>{ "error": "AsyncRequired", "description": "This service plan requires client support for asynchronous service operations." }</code>, as described below.  |
 
@@ -497,7 +497,7 @@ For success responses, a broker may return the following field. Others will be i
 
 If `bindable:true` is declared for a service or plan in the [Catalog](#catalog-mgmt) endpoint, broker clients may request generation of a service binding. 
 
-<p class="note"><strong>Note</strong>: Not all services must be bindable --- some deliver value just from being provisioned. Brokers that offer services that are bindable should declare them as such using <code>bindable: true</code> in the <a href="#catalog-mgmt">Catalog</a>. Brokers that do not offer any bindable services do not need to implement the endpoint for bind requests.</p>
+<p class="note"><strong>Note</strong>: Not all services must be bindable --- some deliver value just from being provisioned. Brokers that offer services that are bindable should declare them as such using <code>bindable: true</code> in the Catalog(#catalog-mgmt). Brokers that do not offer any bindable services do not need to implement the endpoint for bind requests.</p>
 
 ### <a id="types-of-binding"</a>Types of Binding 
 
